@@ -9,26 +9,34 @@ const categories = {
 };
 
 app.get('/parse', async (req, res) => {
-  const category = req.query.category?.toLowerCase();
-  const url = categories[category];
-  if (!url) return res.status(400).json({ error: 'Unknown category' });
+  try {
+    const category = req.query.category?.toLowerCase();
+    const url = categories[category];
+    if (!url) return res.status(400).json({ error: 'Unknown category' });
 
-  const browser = await puppeteer.launch({ headless: true });
-  const page = await browser.newPage();
-  await page.goto(url, { waitUntil: 'networkidle2' });
-
-  const products = await page.evaluate(() => {
-    const items = [];
-    document.querySelectorAll('[data-testid="product-card"]').forEach(card => {
-      const name = card.querySelector('[data-testid="product-title"]')?.innerText?.trim();
-      const price = card.querySelector('[data-testid="price"]')?.innerText?.trim();
-      if (name && price) items.push({ name, price });
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
-    return items;
-  });
 
-  await browser.close();
-  res.json(products);
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: 'networkidle2' });
+
+    const products = await page.evaluate(() => {
+      const items = [];
+      document.querySelectorAll('[data-testid="product-card"]').forEach(card => {
+        const name = card.querySelector('[data-testid="product-title"]')?.innerText?.trim();
+        const price = card.querySelector('[data-testid="price"]')?.innerText?.trim();
+        if (name && price) items.push({ name, price });
+      });
+      return items;
+    });
+
+    await browser.close();
+    res.json(products);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/', (req, res) => res.send('Metro Parser API'));
